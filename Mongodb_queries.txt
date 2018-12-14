@@ -1,0 +1,43 @@
+SIMPLE QUERY 1:
+db.combinedinfo.aggregate([
+ {$match:{$or:[{Id:?},{ParentId:?}]}},
+ {$unwind : "$user_info"},
+ {$group : {"_id":{"User":"$user_info.Id","DisplayName":"$user_info.DisplayName","CreationDate":"$user_info.CreationDate","Upvotes":"$user_info.UpVotes","Downvotes":"$user_info.DownVotes"}}}
+     ])
+
+SIMPLE QUERY 2:
+db.combinedinfo.aggregate([{"$match":{"PostTypeId":1}},{"$match":{"tags":"?"}},{"$group" :{"_id" : {"question":"$Title","Topic":"$tags","Viewcount":{"$max":"$ViewCount"}}}},
+{"$sort":{"_id.Viewcount":-1}},{$limit:1}])
+
+ANALYTICAL QUERY 1:
+
+db.combinedinfo.aggregate([
+{$lookup: {
+from: "combinedinfo",
+localField: "AcceptedAnswerId" ,
+foreignField: "Id",
+as: "Answer_info"}
+},{$unwind : "$Answer_info"},
+{$project:{Tags: '$tags',Id:'$Id', duration:{$subtract:["$Answer_info.CreationDate","$CreationDate"]}, Title: '$Title'}},
+{$match:{Tags: {$in:['?','?']}}},
+{$group:{_id: "$Tags",duration :{$push:{duration: "$duration",question : "$Title"}}}},
+{"$sort": { "duration.duration": 1 } }])
+
+ANALYTICAL QUERY 2:
+
+﻿ ﻿db.combinedinfo.aggregate([
+  {$match: {
+      $and:[{
+        CreationDate: {$gt: ISODate("2016-04-29T00:00:00.000Z"),$lt: ISODate("2018-05-01T00:00:00.000Z")},      
+      $or:[{"PostTypeId": 1,"PostTypeId": 2}],              
+        }]}},//To check for question and answers in a range
+    {$lookup: {
+    from: "combinedinfo",
+    localField: "ParentId" ,
+    foreignField: "Id",
+    as: "Question_usercount"}},
+    {$unwind : "$Question_usercount"},
+    {$unwind : "$Question_usercount.tags"},
+    {$group:{_id:"$Question_usercount.tags",users:{$sum:1}}} ,//aggregating users
+    {$sort: {users: -1} },{$limit:5}])
+
